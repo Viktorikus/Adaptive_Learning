@@ -1,11 +1,11 @@
-import nltk
 from nltk.tokenize import word_tokenize
 
-
 def tokenize_text(text: str):
-    import nltk
-    nltk.download('punkt', quiet=True)
-    from nltk.tokenize import word_tokenize
+    """
+    Tokenisasi teks menggunakan NLTK (word-level)
+    Digunakan untuk analisis NLP lanjutan
+    """
+    if not text:
+        return []
 
     return word_tokenize(text.lower())
-
