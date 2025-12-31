@@ -1,6 +1,6 @@
 from flask import Flask
 from flask_cors import CORS
-from backend.routes.soal_routes import soal_bp
+from backend.models.routes.soal_routes import soal_bp
 from backend.ai_engine.nlp.nltk_setup import setup_nltk
 
 app = Flask(__name__)
