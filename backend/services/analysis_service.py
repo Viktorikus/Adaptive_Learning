@@ -49,6 +49,8 @@ def extract_spltv_coefficients(text: str):
     # Normalisasi: ganti koma dengan newline agar regex bekerja per baris
     text = text.replace(',', '\n')
 
+    text = text.lower().replace(',', '\n').replace(' ', '')
+
     equations = re.findall(r'([^\n=]+)=([^\n]+)', text)
 
     results = []
@@ -96,51 +98,99 @@ def extract_spltv_coefficients(text: str):
 
     return results if len(results) >= 3 else None
 
-def evaluate_spltv_answer(coefficients, student_answer):
-    """
-    Evaluasi jawaban siswa terhadap SPLTV
-    coefficients: list of dict [{x,y,z,const}, ...]
-    student_answer: dict {"x": int, "y": int, "z": int}
-    """
+# def evaluate_spltv_answer(coefficients, student_answer):
+#     """
+#     Evaluasi jawaban siswa terhadap SPLTV
+#     coefficients: list of dict [{x,y,z,const}, ...]
+#     student_answer: dict {"x": int, "y": int, "z": int}
+#     """
 
+#     try:
+#         x = float(student_answer.get("x"))
+#         y = float(student_answer.get("y"))
+#         z = float(student_answer.get("z"))
+#     except:
+#         return {
+#             "valid": False,
+#             "message": "Jawaban siswa tidak valid"
+#         }
+
+#     results = []
+
+#     # Tolerance for float comparison
+#     epsilon = 0.5
+
+#     for idx, eq in enumerate(coefficients):
+#         left_value = (
+#             eq["x"] * x +
+#             eq["y"] * y +
+#             eq["z"] * z
+#         )
+
+#         is_correct = abs(left_value - eq["const"]) < epsilon
+
+#         results.append({
+#             "persamaan_ke": idx + 1,
+#             "hasil": is_correct,
+#             "nilai_dihitung": left_value,
+#             "nilai_seharusnya": eq["const"]
+#         })
+
+#     final_result = all(item["hasil"] for item in results)
+
+#     return {
+#         "valid": True,
+#         "benar": final_result,
+#         "detail": results
+#     }
+
+def evaluate_spltv_answer(coefficients, student_answer, tolerance=0.1):
+    """
+    Evaluasi jawaban siswa dengan membandingkan hasil Solver NumPy.
+    """
+    
+    # 1. Validasi Input Siswa
     try:
-        x = float(student_answer.get("x"))
-        y = float(student_answer.get("y"))
-        z = float(student_answer.get("z"))
-    except:
+        x_siswa = float(student_answer.get("x", 0))
+        y_siswa = float(student_answer.get("y", 0))
+        z_siswa = float(student_answer.get("z", 0))
+    except ValueError:
+        return {"valid": False, "message": "Input harus berupa angka"}
+
+    # 2. Cari Kunci Jawaban (The Golden Truth)
+    solution = solve_spltv_numpy(coefficients)
+    
+    # CASE: Jika soal matematika-nya rusak (tidak ada solusi / solusi ganda)
+    if not solution:
         return {
             "valid": False,
-            "message": "Jawaban siswa tidak valid"
+            "message": "Soal ini tidak memiliki solusi tunggal (Singular Matrix). Cek kembali soalnya."
         }
 
-    results = []
+    # 3. Bandingkan Jawaban
+    detail = {}
+    correct_count = 0
+    
+    for var, val_siswa in zip(["x", "y", "z"], [x_siswa, y_siswa, z_siswa]):
+        val_benar = solution[var]
+        
+        # Cek selisih (menggunakan abs diff untuk float)
+        if abs(val_siswa - val_benar) <= tolerance:
+            detail[var] = "Benar"
+            correct_count += 1
+        else:
+            # Feedback yang edukatif
+            detail[var] = f"Salah (Kamu jawab: {val_siswa}, Seharusnya: {val_benar})"
 
-    # Tolerance for float comparison
-    epsilon = 0.5
-
-    for idx, eq in enumerate(coefficients):
-        left_value = (
-            eq["x"] * x +
-            eq["y"] * y +
-            eq["z"] * z
-        )
-
-        is_correct = abs(left_value - eq["const"]) < epsilon
-
-        results.append({
-            "persamaan_ke": idx + 1,
-            "hasil": is_correct,
-            "nilai_dihitung": left_value,
-            "nilai_seharusnya": eq["const"]
-        })
-
-    final_result = all(item["hasil"] for item in results)
-
+    # 4. Return Hasil Akhir
     return {
         "valid": True,
-        "benar": final_result,
-        "detail": results
+        "is_correct": correct_count == 3, # Boolean final
+        "score": (correct_count / 3) * 100, # Bisa tambah fitur skor
+        "detail": detail,
+        "kunci_jawaban": solution
     }
+
 
 def solve_spltv_numpy(coefficients):
     """

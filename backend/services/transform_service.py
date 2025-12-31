@@ -2,6 +2,7 @@ from backend.ai_engine.ml.model_loader import load_adaptive_model
 from backend.ai_engine.text_transformer import transform_spltv_text
 from backend.services.analysis_service import evaluate_spltv_answer
 from backend.services.analysis_service import solve_spltv_numpy
+from backend.ai_engine.nlp.literacy_classifier import classify_spltv_error
 
 def solve_spltv_service(soal_text: str, konteks: str):
     """
@@ -61,10 +62,13 @@ def evaluate_soal_service(soal_text, konteks, student_answer):
 
     evaluation = evaluate_spltv_answer(coefficients, student_answer)
 
+    error_analysis = classify_spltv_error(evaluation)
+
     return {
         "success": True,
         "materi": "SPLTV",
-        "evaluation": evaluation
+        "evaluation": evaluation,
+        "error_analysis": error_analysis
     }
 
 # def adaptive_learning_service(evaluation_result):
