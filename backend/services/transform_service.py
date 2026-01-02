@@ -41,10 +41,6 @@ def transform_soal_service(soal_text: str, konteks: str):
     )
 
 def evaluate_soal_service(soal_text, konteks, student_answer):
-    """
-    Service evaluasi jawaban SPLTV
-    """
-
     transform_result = transform_spltv_text(soal_text, konteks)
 
     if not transform_result.get("success"):
@@ -52,23 +48,18 @@ def evaluate_soal_service(soal_text, konteks, student_answer):
 
     coefficients = transform_result.get("coefficients")
 
-    correct_solution = solve_spltv_numpy(coefficients)
-
-    if not correct_solution:
-        return {
-            "success": False,
-            "message": "Gagal menyelesaikan SPLTV untuk evaluasi"
-        }
-
     evaluation = evaluate_spltv_answer(coefficients, student_answer)
 
     error_analysis = classify_spltv_error(evaluation)
+
+    learning_strategy = map_error_to_learning_strategy(error_analysis)
 
     return {
         "success": True,
         "materi": "SPLTV",
         "evaluation": evaluation,
-        "error_analysis": error_analysis
+        "error_analysis": error_analysis,
+        "learning_strategy": learning_strategy
     }
 
 # def adaptive_learning_service(evaluation_result):
@@ -85,3 +76,39 @@ def evaluate_soal_service(soal_text, konteks, student_answer):
 #         "error_analysis": error_analysis,
 #         "adaptive_decision": decision
 #     }
+
+def map_error_to_learning_strategy(error_analysis: dict):
+    """
+    Mapping error_type ke strategi pembelajaran
+    """
+
+    error_type = error_analysis.get("error_type")
+
+    if error_type == "no_error":
+        return {
+            "learning_strategy": "advanced_practice",
+            "recommendation": "Berikan soal SPLTV dengan tingkat kesulitan lebih tinggi."
+        }
+
+    elif error_type == "procedural_error":
+        return {
+            "learning_strategy": "guided_practice",
+            "recommendation": "Latihan SPLTV dengan panduan langkah-langkah penyelesaian."
+        }
+
+    elif error_type == "conceptual_error":
+        return {
+            "learning_strategy": "remedial_concept",
+            "recommendation": "Penguatan konsep dasar SPLTV sebelum latihan lanjutan."
+        }
+
+    elif error_type == "invalid_format":
+        return {
+            "learning_strategy": "literacy_support",
+            "recommendation": "Latihan memahami soal cerita dan pemodelan SPLTV."
+        }
+
+    return {
+        "learning_strategy": "unknown",
+        "recommendation": "Strategi pembelajaran belum tersedia."
+    }
