@@ -1,9 +1,9 @@
-from backend.ai_engine.ml.model_loader import load_adaptive_model
+from backend.ai_engine.ml.model_loader import predict_next_action
 from backend.ai_engine.text_transformer import transform_spltv_text
 from backend.services.analysis_service import evaluate_spltv_answer
 from backend.services.analysis_service import solve_spltv_numpy
 from backend.ai_engine.nlp.literacy_classifier import classify_spltv_error
-from backend.ai_engine.ml.random_forest import predict_learning_strategy
+# from backend.ai_engine.ml.random_forest import predict_learning_strategy
 
 def solve_spltv_service(soal_text: str, konteks: str):
     """
@@ -60,10 +60,10 @@ def evaluate_soal_service(soal_text, konteks, student_answer):
 
     score = evaluation.get("score", 0)
 
-    rf_strategy = predict_learning_strategy(
-        error_analysis["error_type"],
-        wrong_count,
-        score
+    adaptive_decision = predict_next_action(
+        score=evaluation["score"],
+        wrong_count=wrong_count,
+        error_type=error_analysis["error_type"]
     )
 
     return {
@@ -73,25 +73,9 @@ def evaluate_soal_service(soal_text, konteks, student_answer):
         "error_analysis": error_analysis,
         "learning_strategy": {
             "rule_based": map_error_to_learning_strategy(error_analysis),
-            "random_forest": rf_strategy
+            "random_forest": adaptive_decision
         }
     }
-
-
-# def adaptive_learning_service(evaluation_result):
-#     error_analysis = analyze_spltv_error(evaluation_result["detail"])
-#     adaptive_model = load_adaptive_model()
-
-#     decision = adaptive_model(
-#         evaluation_result=evaluation_result,
-#         error_analysis=error_analysis
-#     )
-
-#     return {
-#         "evaluation": evaluation_result,
-#         "error_analysis": error_analysis,
-#         "adaptive_decision": decision
-#     }
 
 def map_error_to_learning_strategy(error_analysis: dict):
     """

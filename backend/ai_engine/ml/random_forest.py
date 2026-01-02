@@ -1,3 +1,7 @@
+# ⚠️ BASELINE MODEL
+# Model ini digunakan hanya untuk tahap awal (dummy).
+# Model final menggunakan adaptive_rf_model.pkl
+
 from sklearn.ensemble import RandomForestClassifier
 import numpy as np
 
