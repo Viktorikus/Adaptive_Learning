@@ -3,6 +3,7 @@ from backend.ai_engine.text_transformer import transform_spltv_text
 from backend.services.analysis_service import evaluate_spltv_answer
 from backend.services.analysis_service import solve_spltv_numpy
 from backend.ai_engine.nlp.literacy_classifier import classify_spltv_error
+from backend.ai_engine.ml.random_forest import predict_learning_strategy
 
 def solve_spltv_service(soal_text: str, konteks: str):
     """
@@ -52,15 +53,30 @@ def evaluate_soal_service(soal_text, konteks, student_answer):
 
     error_analysis = classify_spltv_error(evaluation)
 
-    learning_strategy = map_error_to_learning_strategy(error_analysis)
+    wrong_count = sum(
+        1 for d in evaluation["detail"].values()
+        if not d.lower().startswith("benar")
+    )
+
+    score = evaluation.get("score", 0)
+
+    rf_strategy = predict_learning_strategy(
+        error_analysis["error_type"],
+        wrong_count,
+        score
+    )
 
     return {
         "success": True,
         "materi": "SPLTV",
         "evaluation": evaluation,
         "error_analysis": error_analysis,
-        "learning_strategy": learning_strategy
+        "learning_strategy": {
+            "rule_based": map_error_to_learning_strategy(error_analysis),
+            "random_forest": rf_strategy
+        }
     }
+
 
 # def adaptive_learning_service(evaluation_result):
 #     error_analysis = analyze_spltv_error(evaluation_result["detail"])
@@ -112,3 +128,4 @@ def map_error_to_learning_strategy(error_analysis: dict):
         "learning_strategy": "unknown",
         "recommendation": "Strategi pembelajaran belum tersedia."
     }
+
