@@ -3,6 +3,9 @@ from backend.ai_engine.text_transformer import transform_spltv_text
 from backend.services.analysis_service import evaluate_spltv_answer
 from backend.services.analysis_service import solve_spltv_numpy
 from backend.ai_engine.nlp.literacy_classifier import classify_spltv_error
+from backend.ai_engine.difficulty_engine import decide_difficulty
+from backend.ai_engine.spltv_generator import generate_spltv_question
+from backend.ai_engine.bfs_planner import bfs_next_action
 # from backend.ai_engine.ml.random_forest import predict_learning_strategy
 
 def solve_spltv_service(soal_text: str, konteks: str):
@@ -60,10 +63,40 @@ def evaluate_soal_service(soal_text, konteks, student_answer):
 
     score = evaluation.get("score", 0)
 
+    # 1️⃣ Random Forest decision
     adaptive_decision = predict_next_action(
-        score=evaluation["score"],
+        score=score,
         wrong_count=wrong_count,
         error_type=error_analysis["error_type"]
+    )
+
+    # 2️⃣ Stage sekarang (PASTIKAN konsisten)
+    current_stage = "latihan_menengah"
+
+    # 3️⃣ Mapping RF → target stage
+    RF_TARGET_MAP = {
+        "naik_level": "latihan_lanjutan",
+        "latihan_lagi": "latihan_menengah",
+        "remedial": "review_konsep"
+    }
+
+    target_stage = RF_TARGET_MAP.get(
+        adaptive_decision["next_action"],
+        current_stage
+    )
+
+    # 4️⃣ BFS planning
+    next_stage = bfs_next_action(
+        start=current_stage,
+        target=target_stage
+    )
+
+    # 5️⃣ Difficulty decision (SETELAH BFS)
+    difficulty_decision = decide_difficulty(next_stage)
+
+    # 6️⃣ Generate soal
+    next_question = generate_spltv_question(
+        difficulty=difficulty_decision["difficulty"]
     )
 
     return {
@@ -74,8 +107,16 @@ def evaluate_soal_service(soal_text, konteks, student_answer):
         "learning_strategy": {
             "rule_based": map_error_to_learning_strategy(error_analysis),
             "random_forest": adaptive_decision
+        },
+        "next_step": {
+            "current_stage": current_stage,
+            "target_stage": target_stage,
+            "next_stage": next_stage,
+            "difficulty_decision": difficulty_decision,
+            "next_question": next_question
         }
     }
+
 
 def map_error_to_learning_strategy(error_analysis: dict):
     """
