@@ -4,28 +4,24 @@ LEARNING_GRAPH = {
     "review_konsep": ["latihan_dasar"],
     "latihan_dasar": ["latihan_menengah"],
     "latihan_menengah": ["latihan_lanjutan"],
-    "latihan_lanjutan": ["evaluasi"],
-    "evaluasi": []
+    "latihan_lanjutan": []
 }
 
-def bfs_next_action(start, target):
+def bfs_next_action(current_stage, target_stage, dominant_error=None):
     """
-    BFS untuk menentukan langkah belajar berikutnya
+    BFS dengan pembatasan berdasarkan error dominan
     """
-    queue = deque([[start]])
-    visited = set()
 
-    while queue:
-        path = queue.popleft()
-        node = path[-1]
+    # 🔒 Safety rule berbasis history
+    if dominant_error == "conceptual_error":
+        return "review_konsep"
 
-        if node == target:
-            # Ambil langkah selanjutnya saja
-            return path[1] if len(path) > 1 else node
+    if dominant_error == "procedural_error" and current_stage == "latihan_menengah":
+        return "latihan_menengah"
 
-        if node not in visited:
-            visited.add(node)
-            for neighbor in LEARNING_GRAPH.get(node, []):
-                queue.append(path + [neighbor])
+    # BFS normal (1-step)
+    neighbors = LEARNING_GRAPH.get(current_stage, [])
+    if target_stage in neighbors:
+        return target_stage
 
-    return start
+    return current_stage

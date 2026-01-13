@@ -1,50 +1,54 @@
 import random
+import numpy as np
 
-def generate_spltv_question(difficulty="medium"):
+def generate_spltv_question(difficulty: str, stage: str):
     """
-    Generate soal SPLTV berdasarkan difficulty
+    Generate soal SPLTV berdasarkan difficulty dan stage
     """
 
-    if difficulty == "easy":
-        coef_range = (1, 5)
-        sol_range = (1, 5)
+    # Tentukan range koefisien berdasarkan stage
+    if stage == "review_konsep":
+        coef_range = (-3, 3)
+        solution_range = (1, 5)
 
-    elif difficulty == "hard":
-        coef_range = (-10, 10)
-        sol_range = (-5, 5)
+    elif stage == "latihan_dasar":
+        coef_range = (-5, 5)
+        solution_range = (1, 7)
 
-    else:  # medium
+    elif stage == "latihan_menengah":
         coef_range = (-7, 7)
-        sol_range = (1, 7)
+        solution_range = (1, 10)
 
-    # solusi sebenarnya
-    x = random.randint(*sol_range)
-    y = random.randint(*sol_range)
-    z = random.randint(*sol_range)
+    elif stage == "latihan_lanjutan":
+        coef_range = (-10, 10)
+        solution_range = (2, 15)
 
-    # koefisien
-    def rand_coef():
-        c = 0
-        while c == 0:
-            c = random.randint(*coef_range)
-        return c
+    else:
+        coef_range = (-5, 5)
+        solution_range = (1, 7)
 
-    a1, b1, c1 = rand_coef(), rand_coef(), rand_coef()
-    a2, b2, c2 = rand_coef(), rand_coef(), rand_coef()
-    a3, b3, c3 = rand_coef(), rand_coef(), rand_coef()
+    # Tentukan solusi terlebih dahulu
+    x = random.randint(*solution_range)
+    y = random.randint(*solution_range)
+    z = random.randint(*solution_range)
 
-    d1 = a1*x + b1*y + c1*z
-    d2 = a2*x + b2*y + c2*z
-    d3 = a3*x + b3*y + c3*z
+    solution = {"x": x, "y": y, "z": z}
 
-    soal = (
-        f"{a1}x + {b1}y + {c1}z = {d1}, "
-        f"{a2}x + {b2}y + {c2}z = {d2}, "
-        f"{a3}x + {b3}y + {c3}z = {d3}"
-    )
+    equations = []
+
+    for _ in range(3):
+        a = random.randint(*coef_range)
+        b = random.randint(*coef_range)
+        c = random.randint(*coef_range)
+
+        const = a*x + b*y + c*z
+
+        eq = f"{a}x + {b}y + {c}z = {const}"
+        equations.append(eq)
 
     return {
-        "soal": soal,
+        "stage": stage,
         "difficulty": difficulty,
-        "kunci_jawaban": {"x": x, "y": y, "z": z}
+        "soal": ", ".join(equations),
+        "kunci_jawaban": solution
     }

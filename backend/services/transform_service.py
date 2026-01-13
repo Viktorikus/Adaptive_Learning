@@ -6,6 +6,12 @@ from backend.ai_engine.nlp.literacy_classifier import classify_spltv_error
 from backend.ai_engine.difficulty_engine import decide_difficulty
 from backend.ai_engine.spltv_generator import generate_spltv_question
 from backend.ai_engine.bfs_planner import bfs_next_action
+from backend.ai_engine.spltv_contextualizer import contextualize_spltv
+from backend.ai_engine.student_model.student_memory import (
+    get_student_profile,
+    update_student_history,
+    get_dominant_error
+)
 # from backend.ai_engine.ml.random_forest import predict_learning_strategy
 
 def solve_spltv_service(soal_text: str, konteks: str):
@@ -45,15 +51,15 @@ def transform_soal_service(soal_text: str, konteks: str):
     )
 
 def evaluate_soal_service(soal_text, konteks, student_answer):
-    transform_result = transform_spltv_text(soal_text, konteks)
+    student_id = "student_001"  # sementara (nanti dari auth)
 
+    transform_result = transform_spltv_text(soal_text, konteks)
     if not transform_result.get("success"):
         return transform_result
 
-    coefficients = transform_result.get("coefficients")
+    coefficients = transform_result["coefficients"]
 
     evaluation = evaluate_spltv_answer(coefficients, student_answer)
-
     error_analysis = classify_spltv_error(evaluation)
 
     wrong_count = sum(
@@ -61,19 +67,20 @@ def evaluate_soal_service(soal_text, konteks, student_answer):
         if not d.lower().startswith("benar")
     )
 
-    score = evaluation.get("score", 0)
+    score = evaluation["score"]
 
-    # 1️⃣ Random Forest decision
+    # === RANDOM FOREST ===
     adaptive_decision = predict_next_action(
         score=score,
         wrong_count=wrong_count,
         error_type=error_analysis["error_type"]
     )
 
-    # 2️⃣ Stage sekarang (PASTIKAN konsisten)
-    current_stage = "latihan_menengah"
+    # === STUDENT MEMORY ===
+    profile = get_student_profile(student_id)
+    dominant_error = get_dominant_error(student_id)
 
-    # 3️⃣ Mapping RF → target stage
+    # === TARGET STAGE ===
     RF_TARGET_MAP = {
         "naik_level": "latihan_lanjutan",
         "latihan_lagi": "latihan_menengah",
@@ -82,40 +89,71 @@ def evaluate_soal_service(soal_text, konteks, student_answer):
 
     target_stage = RF_TARGET_MAP.get(
         adaptive_decision["next_action"],
-        current_stage
+        profile["current_stage"]
     )
 
-    # 4️⃣ BFS planning
+    # === BFS + HISTORY ===
     next_stage = bfs_next_action(
-        start=current_stage,
-        target=target_stage
+        current_stage=profile["current_stage"],
+        target_stage=target_stage,
+        dominant_error=dominant_error
     )
 
-    # 5️⃣ Difficulty decision (SETELAH BFS)
-    difficulty_decision = decide_difficulty(next_stage)
+    # === DIFFICULTY ===
+    difficulty_decision = decide_difficulty(
+        adaptive_decision["next_action"]
+    )
 
-    # 6️⃣ Generate soal
     next_question = generate_spltv_question(
+        stage=next_stage,
         difficulty=difficulty_decision["difficulty"]
+    )
+
+    # === UPDATE MEMORY ===
+    update_student_history(
+        student_id=student_id,
+        score=score,
+        error_type=error_analysis["error_type"],
+        next_action=adaptive_decision["next_action"],
+        next_stage=next_stage
+    )
+
+    contextual_result = contextualize_spltv(
+        soal_math=next_question["soal"],
+        minat=konteks
     )
 
     return {
         "success": True,
         "materi": "SPLTV",
+
         "evaluation": evaluation,
+
         "error_analysis": error_analysis,
+
         "learning_strategy": {
             "rule_based": map_error_to_learning_strategy(error_analysis),
             "random_forest": adaptive_decision
         },
+
         "next_step": {
-            "current_stage": current_stage,
+            "current_stage": profile["current_stage"],
             "target_stage": target_stage,
             "next_stage": next_stage,
             "difficulty_decision": difficulty_decision,
-            "next_question": next_question
+
+            "next_question": {
+                "difficulty": difficulty_decision["difficulty"],
+                "stage": next_stage,
+                "soal_matematis": next_question["soal"],
+                "soal_kontekstual": contextual_result["soal"],
+                "kunci_jawaban": next_question["kunci_jawaban"],
+                "minat": konteks,
+                "variabel_konteks": contextual_result["variabel"]
+            }
         }
     }
+
 
 
 def map_error_to_learning_strategy(error_analysis: dict):
