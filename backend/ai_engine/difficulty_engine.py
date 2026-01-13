@@ -1,26 +1,35 @@
-def decide_difficulty(next_stage: str):
+def decide_difficulty(next_action, current_stage, dominant_error=None):
     """
-    Menentukan tingkat kesulitan soal berdasarkan learning stage (hasil BFS)
+    Menentukan difficulty berdasarkan aksi, stage, dan histori error
     """
 
-    if next_stage in ["review_konsep", "latihan_dasar"]:
+    # Safety first
+    if dominant_error == "conceptual_error":
         return {
             "difficulty": "easy",
-            "reason": "Fokus penguatan konsep dasar"
+            "reason": "Conceptual error detected"
         }
 
-    if next_stage == "latihan_menengah":
+    if dominant_error == "procedural_error":
         return {
             "difficulty": "medium",
-            "reason": "Penguatan keterampilan prosedural"
+            "reason": "Procedural reinforcement"
         }
 
-    if next_stage == "latihan_lanjutan":
+    # Mastery escalation
+    if next_action == "naik_level":
+        if current_stage == "latihan_lanjutan":
+            return {
+                "difficulty": "hard",
+                "reason": "Mastery at advanced stage"
+            }
+
         return {
-            "difficulty": "hard",
-            "reason": "Siswa siap tantangan lebih tinggi"
+            "difficulty": "medium",
+            "reason": "Level up"
         }
 
+    # Default fallback
     return {
         "difficulty": "medium",
         "reason": "Default difficulty"

@@ -51,14 +51,16 @@ def transform_soal_service(soal_text: str, konteks: str):
     )
 
 def evaluate_soal_service(soal_text, konteks, student_answer):
-    student_id = "student_001"  # sementara (nanti dari auth)
+    student_id = "student_001"  # sementara
 
+    # === TRANSFORM SOAL ===
     transform_result = transform_spltv_text(soal_text, konteks)
     if not transform_result.get("success"):
         return transform_result
 
     coefficients = transform_result["coefficients"]
 
+    # === EVALUASI ===
     evaluation = evaluate_spltv_answer(coefficients, student_answer)
     error_analysis = classify_spltv_error(evaluation)
 
@@ -66,7 +68,6 @@ def evaluate_soal_service(soal_text, konteks, student_answer):
         1 for d in evaluation["detail"].values()
         if not d.lower().startswith("benar")
     )
-
     score = evaluation["score"]
 
     # === RANDOM FOREST ===
@@ -75,35 +76,37 @@ def evaluate_soal_service(soal_text, konteks, student_answer):
         wrong_count=wrong_count,
         error_type=error_analysis["error_type"]
     )
+    next_action = adaptive_decision["next_action"]
 
     # === STUDENT MEMORY ===
     profile = get_student_profile(student_id)
+    current_stage = profile["current_stage"]
     dominant_error = get_dominant_error(student_id)
 
-    # === TARGET STAGE ===
-    RF_TARGET_MAP = {
+    # === ACTION → TARGET STAGE ===
+    ACTION_TO_STAGE = {
         "naik_level": "latihan_lanjutan",
-        "latihan_lagi": "latihan_menengah",
+        "latihan_lagi": current_stage,
         "remedial": "review_konsep"
     }
 
-    target_stage = RF_TARGET_MAP.get(
-        adaptive_decision["next_action"],
-        profile["current_stage"]
-    )
+    target_stage = ACTION_TO_STAGE.get(next_action, current_stage)
 
-    # === BFS + HISTORY ===
+    # === BFS (LANGSUNG NEXT STAGE) ===
     next_stage = bfs_next_action(
-        current_stage=profile["current_stage"],
+        current_stage=current_stage,
         target_stage=target_stage,
         dominant_error=dominant_error
     )
 
     # === DIFFICULTY ===
     difficulty_decision = decide_difficulty(
-        adaptive_decision["next_action"]
+        next_action=adaptive_decision["next_action"],
+        current_stage=next_stage,
+        dominant_error=dominant_error
     )
 
+    # === GENERATE SOAL ===
     next_question = generate_spltv_question(
         stage=next_stage,
         difficulty=difficulty_decision["difficulty"]
@@ -114,10 +117,11 @@ def evaluate_soal_service(soal_text, konteks, student_answer):
         student_id=student_id,
         score=score,
         error_type=error_analysis["error_type"],
-        next_action=adaptive_decision["next_action"],
+        next_action=next_action,
         next_stage=next_stage
     )
 
+    # === KONTEKSTUALISASI ===
     contextual_result = contextualize_spltv(
         soal_math=next_question["soal"],
         minat=konteks
@@ -128,7 +132,6 @@ def evaluate_soal_service(soal_text, konteks, student_answer):
         "materi": "SPLTV",
 
         "evaluation": evaluation,
-
         "error_analysis": error_analysis,
 
         "learning_strategy": {
@@ -137,7 +140,7 @@ def evaluate_soal_service(soal_text, konteks, student_answer):
         },
 
         "next_step": {
-            "current_stage": profile["current_stage"],
+            "current_stage": current_stage,
             "target_stage": target_stage,
             "next_stage": next_stage,
             "difficulty_decision": difficulty_decision,
@@ -153,8 +156,6 @@ def evaluate_soal_service(soal_text, konteks, student_answer):
             }
         }
     }
-
-
 
 def map_error_to_learning_strategy(error_analysis: dict):
     """

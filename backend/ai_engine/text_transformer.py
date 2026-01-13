@@ -5,7 +5,30 @@ from backend.services.analysis_service import (
     extract_spltv_coefficients
 )
 from backend.utils.json_helper import build_response
+import re
 
+def is_spltv_question(text: str) -> bool:
+    """
+    Validasi SPLTV yang benar secara matematis
+    """
+
+    equations = [eq.strip() for eq in text.split(",")]
+    if len(equations) != 3:
+        return False
+
+    variables_found = set()
+
+    for eq in equations:
+        # pastikan ada '='
+        if "=" not in eq:
+            return False
+
+        # cari variabel yang muncul
+        vars_in_eq = re.findall(r"[xyz]", eq)
+        variables_found.update(vars_in_eq)
+
+    # SPLTV HARUS x, y, z (tidak harus di setiap persamaan)
+    return variables_found == {"x", "y", "z"}
 
 def transform_spltv_text(soal_text: str, konteks: str = "umum"):
     """
@@ -20,39 +43,45 @@ def transform_spltv_text(soal_text: str, konteks: str = "umum"):
             message="Teks soal kosong"
         )
 
-    # 2. Cleaning teks
+    # 2. Cleaning teks dasar
     cleaned_text = clean_text(soal_text)
 
-    # 3. Validasi SPLTV
-    if not is_spltv_question(cleaned_text):
+    # 3. Normalisasi SPLTV (PENTING: hapus 0x, 0y, 0z)
+    equations = [eq.strip() for eq in cleaned_text.split(",")]
+    equations = [normalize_equation(eq) for eq in equations]
+    normalized_text = ", ".join(equations)
+
+    # 4. Validasi SPLTV (SETELAH normalisasi)
+    if not is_spltv_question(normalized_text):
         return build_response(
             success=False,
             message="Soal bukan termasuk SPLTV"
         )
 
-    # 4. Tokenisasi (disiapkan untuk AI adaptif)
-    tokens = tokenize_text(cleaned_text)
+    # 5. Tokenisasi (untuk AI adaptif / NLP)
+    tokens = tokenize_text(normalized_text)
 
-    # 5. Ekstraksi koefisien & konstanta SPLTV
-    coefficients = extract_spltv_coefficients(cleaned_text)
+    # 6. Ekstraksi koefisien SPLTV
+    coefficients = extract_spltv_coefficients(normalized_text)
     if not coefficients:
         return build_response(
             success=False,
             message="Gagal mengekstraksi koefisien SPLTV"
         )
 
-    # 6. Transformasi konteks (narasi saja)
-    transformed_text = apply_context_transformation(cleaned_text, konteks)
+    # 7. Transformasi konteks (narasi saja, tidak mengubah matematika)
+    transformed_text = apply_context_transformation(normalized_text, konteks)
 
     return build_response(
         success=True,
         materi="SPLTV",
         konteks=konteks,
         original_soal=soal_text,
-        cleaned_soal=cleaned_text,
+        cleaned_soal=normalized_text,
         transformed_soal=transformed_text,
         coefficients=coefficients
     )
+
 
 
 def apply_context_transformation(text: str, konteks: str):
@@ -109,3 +138,18 @@ def analyze_spltv_error(evaluation_detail):
         "error_type": "partial",
         "message": "Sebagian persamaan belum terpenuhi"
     }
+
+def normalize_equation(eq: str):
+    """
+    Menghapus variabel dengan koefisien 0 agar parser SPLTV stabil
+    """
+    return (
+        eq.replace("+ 0x", "")
+          .replace("+ 0y", "")
+          .replace("+ 0z", "")
+          .replace("- 0x", "")
+          .replace("- 0y", "")
+          .replace("- 0z", "")
+          .replace("  ", " ")
+          .strip()
+    )
